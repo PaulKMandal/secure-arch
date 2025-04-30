@@ -12,11 +12,8 @@ while true; do
   echo
   read -rsp "Confirm LUKS passphrase: " LUKS_PASS2
   echo
-  if [[ "$LUKS_PASS" == "$LUKS_PASS2" ]]; then
-    break
-  else
-    echo "❌  Passphrases do not match, please try again."
-  fi
+  [[ "$LUKS_PASS" == "$LUKS_PASS2" ]] && break
+  echo "❌  Passphrases do not match, please try again."
 done
 
 # Timezone defaults
@@ -31,11 +28,8 @@ CRYPT_NAME=cryptlvm
 VG_NAME=vg
 LV_NAME=root
 
-# locale / keyboard
 LOCALE="en_US.UTF-8"
 KEYMAP="us"
-
-# extra packages beyond base/linux/linux-firmware
 EXTRA_PACKAGES="sudo vim lvm2 dracut sbsigntools iwd git efibootmgr binutils dhcpcd man-db"
 
 ### ─── STAGE 1: Live USB ────────────────────────────────────────────────────
@@ -51,15 +45,10 @@ echo "📂  Formatting EFI..."
 mkfs.fat -F32 "${EFI_PART}"
 
 echo "🔒  Setting up LUKS2 on ${LUKS_PART}..."
-echo -n "$LUKS_PASS" | \
-  cryptsetup luksFormat --type luks2 --batch-mode "${LUKS_PART}" -
-echo -n "$LUKS_PASS" | \
-  cryptsetup open \
-    --perf-no_read_workqueue \
-    --perf-no_write_workqueue \
-    --persistent \
-    --key-file=- \
-    "${LUKS_PART}" "${CRYPT_NAME}"
+echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 --batch-mode "${LUKS_PART}" -
+echo -n "$LUKS_PASS" | cryptsetup open \
+    --perf-no_read_workqueue --perf-no_write_workqueue --persistent \
+    --key-file=- "${LUKS_PART}" "${CRYPT_NAME}"
 
 echo "🗃️  LVM setup..."
 pvcreate "/dev/mapper/${CRYPT_NAME}"
@@ -74,17 +63,17 @@ mount "/dev/${VG_NAME}/${LV_NAME}" /mnt
 mkdir -p /mnt/boot/efi
 mount "${EFI_PART}" /mnt/boot/efi
 
-### ─── AUTO-DETECT CPU MICROCODE ──────────────────────────────────────────────
-CPU_UCODE=""
+### ─── AUTO-DETECT MICROCODE ────────────────────────────────────────────────
 CPU_VENDOR_ID=$(awk -F: '/^vendor_id/ {print $2; exit}' /proc/cpuinfo | tr -d '[:space:]')
-if   [[ "$CPU_VENDOR_ID" == "GenuineIntel" ]]; then
+if [[ "$CPU_VENDOR_ID" == "GenuineIntel" ]]; then
   CPU_UCODE="intel-ucode"
 elif [[ "$CPU_VENDOR_ID" == "AuthenticAMD" ]]; then
   CPU_UCODE="amd-ucode"
 else
-  echo "⚠️  Unknown CPU vendor '$CPU_VENDOR_ID' – no microcode package will be installed."
+  CPU_UCODE=""
+  echo "⚠️  Unknown CPU vendor '$CPU_VENDOR_ID' → skipping microcode."
 fi
-echo "🔍  Detected CPU vendor: $CPU_VENDOR_ID → will install: ${CPU_UCODE:-<none>}"
+echo "🔍  Will install microcode: ${CPU_UCODE:-<none>}"
 
 echo "📦  Installing base system..."
 pacstrap /mnt base linux linux-firmware ${CPU_UCODE} ${EXTRA_PACKAGES}
@@ -96,7 +85,7 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 cat > /mnt/root/chroot-install.sh <<EOF
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 echo "🔐  Set root password:"
 passwd
@@ -106,15 +95,15 @@ ln -sf /usr/share/zoneinfo/${REGION}/${CITY} /etc/localtime
 hwclock --systohc
 
 echo "🔤  Locale"
-sed -i 's/^#\(${LOCALE}\)/\1/' /etc/locale.gen
+sed -i 's/^#\\(${LOCALE}\\)/\\1/' /etc/locale.gen
 locale-gen
 echo LANG=${LOCALE} > /etc/locale.conf
 
 echo "⌨️  Console keymap"
-echo "KEYMAP=${KEYMAP}" > /etc/vconsole.conf
+echo KEYMAP=${KEYMAP} > /etc/vconsole.conf
 
 echo "🏷️  Hostname & hosts"
-echo "${HOSTNAME}" > /etc/hostname
+echo ${HOSTNAME} > /etc/hostname
 cat >> /etc/hosts <<HST
 127.0.0.1   localhost
 ::1         localhost
@@ -126,9 +115,9 @@ useradd -m -G wheel -s /bin/bash ${USERNAME}
 echo "🔐  Set password for ${USERNAME}:"
 passwd ${USERNAME}
 
-# Enable wheel + perpetual sudo timeout
-sed -i 's/^# \(%wheel ALL=(ALL) ALL\)/\1/' /etc/sudoers
-echo "Defaults timestamp_timeout=-1" >> /etc/sudoers
+# Enable wheel + perpetual sudo
+sed -i 's/^# \\(%wheel ALL=(ALL) ALL\\)/\\1/' /etc/sudoers
+echo Defaults timestamp_timeout=-1 >> /etc/sudoers
 
 echo "🌐  Enable networking"
 systemctl enable dhcpcd iwd
@@ -183,7 +172,7 @@ Exec = /usr/local/bin/dracut-remove.sh
 NeedsTargets
 HREM
 
-echo "🔑  Dracut unlock and LVM config"
+echo "🔑  Dracut LUKS & LVM config"
 UUID=\$(blkid -s UUID -o value ${LUKS_PART})
 mkdir -p /etc/dracut.conf.d
 cat > /etc/dracut.conf.d/cmdline.conf <<CMD
@@ -201,7 +190,7 @@ pacman -S --noconfirm linux
 echo "🖥️  Create UEFI boot entry"
 efibootmgr --create --disk ${DISK} --part 1 \
   --label "Arch Linux" \
-  --loader 'EFI\\Linux\\arch-linux.efi' \
+  --loader 'EFI\\\\Linux\\\\arch-linux.efi' \
   --unicode
 
 echo "✅  Done!  Exit chroot and reboot."
