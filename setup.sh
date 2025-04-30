@@ -19,15 +19,19 @@ while true; do
   fi
 done
 
+# Timezone defaults
+read -rp "Time zone region (default America): " REGION
+REGION=${REGION:-America}
+read -rp "Time zone city   (default Chicago): " CITY
+CITY=${CITY:-Chicago}
+
 EFI_PART="${DISK}p1"
 LUKS_PART="${DISK}p2"
 CRYPT_NAME=cryptlvm
 VG_NAME=vg
 LV_NAME=root
 
-# locale / timezone / keyboard
-REGION="Europe"
-CITY="London"
+# locale / keyboard
 LOCALE="en_US.UTF-8"
 KEYMAP="us"
 
@@ -49,7 +53,6 @@ mkfs.fat -F32 "${EFI_PART}"
 echo "🔒  Setting up LUKS2 on ${LUKS_PART}..."
 echo -n "$LUKS_PASS" | \
   cryptsetup luksFormat --type luks2 --batch-mode "${LUKS_PART}" -
-
 echo -n "$LUKS_PASS" | \
   cryptsetup open \
     --perf-no_read_workqueue \
@@ -71,7 +74,7 @@ mount "/dev/${VG_NAME}/${LV_NAME}" /mnt
 mkdir -p /mnt/boot/efi
 mount "${EFI_PART}" /mnt/boot/efi
 
-### ─── AUTO‑DETECT CPU MICROCODE ──────────────────────────────────────────────
+### ─── AUTO-DETECT CPU MICROCODE ──────────────────────────────────────────────
 CPU_UCODE=""
 CPU_VENDOR_ID=$(awk -F: '/^vendor_id/ {print $2; exit}' /proc/cpuinfo | tr -d '[:space:]')
 if   [[ "$CPU_VENDOR_ID" == "GenuineIntel" ]]; then
@@ -91,7 +94,7 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 ### ─── STAGE 2: Chroot setup ────────────────────────────────────────────────
 
-cat > /mnt/root/chroot-install.sh <<'EOF'
+cat > /mnt/root/chroot-install.sh <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -123,7 +126,7 @@ useradd -m -G wheel -s /bin/bash ${USERNAME}
 echo "🔐  Set password for ${USERNAME}:"
 passwd ${USERNAME}
 
-# Enable wheel + perpetual sudo timestamp
+# Enable wheel + perpetual sudo timeout
 sed -i 's/^# \(%wheel ALL=(ALL) ALL\)/\1/' /etc/sudoers
 echo "Defaults timestamp_timeout=-1" >> /etc/sudoers
 
@@ -192,7 +195,7 @@ compress="zstd"
 hostonly="no"
 FLG
 
-echo "🔄  Re‑install linux to build UKI"
+echo "🔄  Re-install linux to build UKI"
 pacman -S --noconfirm linux
 
 echo "🖥️  Create UEFI boot entry"
