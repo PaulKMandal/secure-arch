@@ -190,7 +190,7 @@ pacman -S --noconfirm linux
 echo "🖥️  Create UEFI boot entry"
 efibootmgr --create --disk ${DISK} --part 1 \
   --label "Arch Linux" \
-  --loader 'EFI\\Linux\\arch-linux.efi' \
+  --loader 'EFI\Linux\arch-linux.efi' \
   --unicode
 
 echo "✅  Done!  Exit chroot and reboot."
