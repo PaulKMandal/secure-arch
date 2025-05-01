@@ -3,6 +3,7 @@ set -euo pipefail
 
 ### ─── INTERACTIVE VARIABLES ──────────────────────────────────────────────────
 read -rp "Target install disk (e.g. /dev/nvme0n1): " DISK
+DISK=${DISK:-/dev/nvme0n1}
 read -rp "New hostname: " HOSTNAME
 read -rp "New username: " USERNAME
 
