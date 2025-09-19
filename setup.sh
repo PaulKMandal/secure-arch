@@ -121,6 +121,16 @@ passwd ${USERNAME}
 sed -i 's/^# \\(%wheel ALL=(ALL) ALL\\)/\\1/' /etc/sudoers
 echo Defaults timestamp_timeout=-1 >> /etc/sudoers
 
+# Add a safe sudoers drop-in for the created account
+cat > /etc/sudoers.d/${USERNAME} <<'SUDOEOF'
+# Allow the created user to run any command via sudo (regular password required)
+${USERNAME} ALL=(ALL) ALL
+SUDOEOF
+chmod 0440 /etc/sudoers.d/${USERNAME}
+
+# sanity-check sudoers
+visudo -c >/dev/null || { echo "⚠️  visudo check failed"; exit 1; }
+
 echo "🌐  Enable networking"
 systemctl enable dhcpcd iwd
 
